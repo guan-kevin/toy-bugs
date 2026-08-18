@@ -4,12 +4,12 @@ import javax.swing.text.Segment;
 
 public class CharSequence_UndefinedHashCode {
     public void foo() {
-        CharSequence segment = new MyCharSequence();
+        MyCharSequence segment = new MyCharSequence();
         segment.hashCode();
     }
 
     public void bar() {
-        CharSequence segment = new MyCharSequence();
+        MyCharSequence segment = new MyCharSequence();
         segment.equals(new MyCharSequence());
     }
 
