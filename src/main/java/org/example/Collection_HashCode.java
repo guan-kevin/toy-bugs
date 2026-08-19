@@ -1,15 +1,24 @@
 package org.example;
 
-public class Collection_HashCode {
-    private int a;
-    public Collection_HashCode(int a) {
-        this.a = a;
+import java.util.AbstractCollection;
+import java.util.Iterator;
+
+public class Collection_HashCode<E> extends AbstractCollection<E> {
+
+    @Override
+    public Iterator<E> iterator() {
+        return null;
     }
 
-    @Override public boolean equals(Object obj) {
-        if (this == obj) return true;
-        if (obj == null || getClass() != obj.getClass()) return false;
-        Collection_HashCode that = (Collection_HashCode) obj;
-        return a == that.a;
+    @Override
+    public int size() {
+        return 0;
     }
+
+    @Override
+    public boolean equals(Object obj) {
+        return obj instanceof Collection_HashCode;
+    }
+
+    // no hashCode()
 }
