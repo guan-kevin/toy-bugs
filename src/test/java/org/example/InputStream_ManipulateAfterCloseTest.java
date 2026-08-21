@@ -1,13 +1,7 @@
 package org.example;
 
-import static org.junit.Assert.fail;
-
-import java.io.BufferedInputStream;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 import org.apache.commons.codec.binary.Base32InputStream;
 import org.apache.commons.codec.binary.Base64InputStream;
@@ -16,187 +10,205 @@ import org.junit.Test;
 public class InputStream_ManipulateAfterCloseTest {
 
     @Test
-    public void testFileInputStreamReadAfterClose() throws Exception {
-        Path file = Files.createTempFile("test", ".txt");
-        Files.write(file, new byte[] {1, 2, 3});
-
-        InputStream in = new FileInputStream(file.toFile());
+    public void readAfterClose() throws Exception {
+        StrictInputStream in = new StrictInputStream();
 
         in.close();
 
-        // SPEC VIOLATION: close -> read
+        // VIOLATION: close -> read
         try {
             in.read();
-            fail("Expected IOException");
         } catch (IOException expected) {
-            // expected
         }
     }
 
     @Test
-    public void testBufferedInputStreamReadAfterClose() throws Exception {
-        Path file = Files.createTempFile("test", ".txt");
-        Files.write(file, new byte[] {1, 2, 3});
-
-        InputStream in =
-                new BufferedInputStream(
-                        new FileInputStream(file.toFile()));
+    public void availableAfterClose() throws Exception {
+        StrictInputStream in = new StrictInputStream();
 
         in.close();
 
-        // SPEC VIOLATION: close -> read
+        // VIOLATION: close -> available
         try {
-            in.read();
-            fail("Expected IOException");
+            in.available();
         } catch (IOException expected) {
-            // expected
         }
     }
 
     @Test
-    public void testBase64WrappingFileInputStreamReadAfterClose()
-            throws Exception {
-
-        Path file = Files.createTempFile("test", ".txt");
-        Files.write(file, "YWJj".getBytes("US-ASCII"));
-
-        InputStream in =
-                new Base64InputStream(
-                        new FileInputStream(file.toFile()));
+    public void skipAfterClose() throws Exception {
+        StrictInputStream in = new StrictInputStream();
 
         in.close();
 
-        // SPEC VIOLATION:
-        // Base64InputStream -> FileInputStream
+        // VIOLATION: close -> skip
         try {
-            in.read();
-            fail("Expected IOException");
+            in.skip(1);
         } catch (IOException expected) {
-            // expected
         }
     }
 
     @Test
-    public void testNestedBase64RootedInFileInputStream()
-            throws Exception {
+    public void resetAfterClose() throws Exception {
+        StrictInputStream in = new StrictInputStream();
 
-        Path file = Files.createTempFile("test", ".txt");
-        Files.write(file, "YWJj".getBytes("US-ASCII"));
+        in.close();
 
-        InputStream in =
-                new Base64InputStream(
-                        new FileInputStream(file.toFile()));
+        // VIOLATION: close -> reset
+        try {
+            in.reset();
+        } catch (IOException expected) {
+        }
+    }
 
+    @Test
+    public void multipleClosesThenRead() throws Exception {
+        StrictInputStream in = new StrictInputStream();
+
+        in.close();
+        in.close();
+        in.close();
+
+        // VIOLATION:
+        //
+        // close close close read
+        try {
+            in.read();
+        } catch (IOException expected) {
+        }
+    }
+
+    @Test
+    public void manipulateBeforeCloseThenReadAfterClose() throws Exception {
+        StrictInputStream in = new StrictInputStream();
+
+        // Valid.
+        in.read();
+        in.available();
+        in.skip(1);
+
+        in.close();
+
+        // VIOLATION.
+        try {
+            in.read();
+        } catch (IOException expected) {
+        }
+    }
+
+    @Test
+    public void base32RootedInStrictStream() throws Exception {
+        StrictInputStream root = new StrictInputStream();
+
+        Base32InputStream in =
+                new Base32InputStream(root);
+
+        in.close();
+
+        // VIOLATION:
+        //
+        // Base32
+        //   |
+        // StrictInputStream
+        try {
+            in.read();
+        } catch (IOException expected) {
+        }
+    }
+
+    @Test
+    public void base64RootedInStrictStream() throws Exception {
+        StrictInputStream root = new StrictInputStream();
+
+        Base64InputStream in =
+                new Base64InputStream(root);
+
+        in.close();
+
+        // VIOLATION:
+        //
+        // Base64
+        //   |
+        // StrictInputStream
+        try {
+            in.read();
+        } catch (IOException expected) {
+        }
+    }
+
+    @Test
+    public void nestedBase64RootedInStrictStream() throws Exception {
+        InputStream in = new StrictInputStream();
+
+        in = new Base64InputStream(in);
+        in = new Base64InputStream(in);
         in = new Base64InputStream(in);
 
         in.close();
 
-        // SPEC VIOLATION:
+        // VIOLATION:
         //
-        // Base64InputStream
-        //       |
-        // Base64InputStream
-        //       |
-        // FileInputStream
+        // Base64
+        //   |
+        // Base64
+        //   |
+        // Base64
+        //   |
+        // StrictInputStream
         try {
             in.read();
-            fail("Expected IOException");
         } catch (IOException expected) {
-            // expected
         }
     }
 
     @Test
-    public void testNestedBase32Base64RootedInFileInputStream()
-            throws Exception {
+    public void mixedNestedBaseNRootedInStrictStream() throws Exception {
+        InputStream in = new StrictInputStream();
 
-        Path file = Files.createTempFile("test", ".txt");
-        Files.write(file, "MFRGG===".getBytes("US-ASCII"));
-
-        InputStream in =
-                new Base32InputStream(
-                        new FileInputStream(file.toFile()));
-
+        in = new Base64InputStream(in);
+        in = new Base32InputStream(in);
         in = new Base64InputStream(in);
         in = new Base32InputStream(in, false);
 
         in.close();
 
-        // SPEC VIOLATION:
+        // VIOLATION:
         //
-        // Base32InputStream
-        //       |
-        // Base64InputStream
-        //       |
-        // Base32InputStream
-        //       |
-        // FileInputStream
+        // Base32
+        //   |
+        // Base64
+        //   |
+        // Base32
+        //   |
+        // Base64
+        //   |
+        // StrictInputStream
         try {
             in.read();
-            fail("Expected IOException");
         } catch (IOException expected) {
-            // expected
         }
     }
 
     @Test
-    public void testAvailableAfterClose() throws Exception {
-        Path file = Files.createTempFile("test", ".txt");
-        Files.write(file, new byte[] {1, 2, 3});
+    public void deeplyNestedUnsafeBaseN() throws Exception {
+        InputStream in = new StrictInputStream();
 
-        InputStream in =
-                new BufferedInputStream(
-                        new FileInputStream(file.toFile()));
+        for (int i = 0; i < 10; i++) {
+            in = new Base32InputStream(
+                    in,
+                    true,
+                    76,
+                    new byte[] {'\r', '\n'});
 
-        in.close();
-
-        // SPEC VIOLATION: close -> available
-        try {
-            in.available();
-            fail("Expected IOException");
-        } catch (IOException expected) {
-            // expected
+            in = new Base32InputStream(in, false);
         }
-    }
-
-    @Test
-    public void testSkipAfterClose() throws Exception {
-        Path file = Files.createTempFile("test", ".txt");
-        Files.write(file, new byte[] {1, 2, 3});
-
-        InputStream in =
-                new BufferedInputStream(
-                        new FileInputStream(file.toFile()));
 
         in.close();
 
-        // SPEC VIOLATION: close -> skip
+        // VIOLATION.
         try {
-            in.skip(1);
-            fail("Expected IOException");
+            in.read();
         } catch (IOException expected) {
-            // expected
-        }
-    }
-
-    @Test
-    public void testResetAfterClose() throws Exception {
-        Path file = Files.createTempFile("test", ".txt");
-        Files.write(file, new byte[] {1, 2, 3});
-
-        BufferedInputStream in =
-                new BufferedInputStream(
-                        new FileInputStream(file.toFile()));
-
-        in.mark(10);
-        in.close();
-
-        // SPEC VIOLATION: close -> reset
-        try {
-            in.reset();
-            fail("Expected IOException");
-        } catch (IOException expected) {
-            // expected
         }
     }
 }
