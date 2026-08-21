@@ -211,4 +211,164 @@ public class InputStream_ManipulateAfterCloseTest {
         } catch (IOException expected) {
         }
     }
+
+    @Test
+    public void base64AvailableAfterClose() throws Exception {
+        InputStream in =
+                new Base64InputStream(new StrictInputStream());
+
+        in.close();
+
+        // VIOLATION:
+        // baseConstruct -> closeBase -> available
+        try {
+            in.available();
+        } catch (IOException expected) {
+        }
+    }
+
+    @Test
+    public void base32SkipAfterClose() throws Exception {
+        InputStream in =
+                new Base32InputStream(new StrictInputStream());
+
+        in.close();
+
+        // VIOLATION:
+        // baseConstruct -> closeBase -> skip
+        try {
+            in.skip(1);
+        } catch (IOException expected) {
+        }
+    }
+
+    @Test
+    public void base64ResetAfterClose() throws Exception {
+        InputStream in =
+                new Base64InputStream(new StrictInputStream());
+
+        in.close();
+
+        // VIOLATION:
+        // baseConstruct -> closeBase -> reset
+        try {
+            in.reset();
+        } catch (IOException expected) {
+        }
+    }
+
+    @Test
+    public void unsafeBase64ManipulateBeforeAndAfterClose() throws Exception {
+        InputStream in =
+                new Base64InputStream(new StrictInputStream());
+
+        // Valid pre-close manipulations.
+        in.read();
+        in.available();
+        in.skip(1);
+
+        in.close();
+
+        // VIOLATION:
+        //
+        // baseConstruct
+        // manipulate*
+        // closeBase
+        // manipulate
+        try {
+            in.read();
+        } catch (IOException expected) {
+        }
+    }
+
+    @Test
+    public void unsafeBase32MultipleClosesThenRead() throws Exception {
+        InputStream in =
+                new Base32InputStream(new StrictInputStream());
+
+        in.close();
+        in.close();
+        in.close();
+
+        // VIOLATION:
+        //
+        // baseConstruct -> closeBase+ -> manipulate
+        try {
+            in.read();
+        } catch (IOException expected) {
+        }
+    }
+
+    @Test
+    public void mixedNestedUnsafeAvailableAfterClose() throws Exception {
+        InputStream in = new StrictInputStream();
+
+        in = new Base64InputStream(in);
+        in = new Base32InputStream(in);
+        in = new Base64InputStream(in);
+
+        in.close();
+
+        // VIOLATION:
+        //
+        // Base64
+        //   |
+        // Base32
+        //   |
+        // Base64
+        //   |
+        // StrictInputStream
+        try {
+            in.available();
+        } catch (IOException expected) {
+        }
+    }
+
+    @Test
+    public void nestedUnsafeWithOverloadedConstructors() throws Exception {
+        InputStream in = new StrictInputStream();
+
+        in = new Base32InputStream(
+                in,
+                true,
+                76,
+                new byte[] {'\r', '\n'});
+
+        in = new Base64InputStream(
+                in,
+                true,
+                76,
+                new byte[] {'\r', '\n'});
+
+        in = new Base32InputStream(in, false);
+
+        in.close();
+
+        // VIOLATION.
+        //
+        // Also tests that:
+        //
+        // BaseNCodecInputStream+.new(InputStream, ..)
+        //
+        // correctly covers constructors having additional arguments.
+        try {
+            in.read();
+        } catch (IOException expected) {
+        }
+    }
+
+    @Test
+    public void readByteArrayAfterClose() throws Exception {
+        StrictInputStream in = new StrictInputStream();
+
+        in.close();
+
+        byte[] buffer = new byte[4];
+
+        // VIOLATION: close -> read(byte[])
+        try {
+            in.read(buffer);
+        } catch (IOException expected) {
+        }
+    }
 }
